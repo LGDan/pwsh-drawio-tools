@@ -21,6 +21,29 @@ Support for:
 - Markdown/section rendering behavior based on custom logic (i.e. if shape has certain fields, render paragraph differently) (Shape Preprocessors)
 - Custom rendering behavior based on page (i.e. cover page, HLD, LLD, Systems, Subsystems, Interfaces, etc)
 
+## diagram-linter.ps1
+
+Functions for building very simple linter rules for diagrams.
+
+```powershell
+# Simple, match everything that does not have a description meta field, return false.
+New-DiagramLinterRule `
+    -Name "All shapes must have a description" `
+    -Where {$null -eq $_.ObjectProperties.description} `
+    -Rule {$false} `
+    -ErrorMessage "Shape does not have a description!"
+
+# Bit more advanced, match objects where a type field is defined as 'ethernet'
+# then enforce it having a number in srcport and dstport.
+New-DiagramLinterRule `
+    -Name "All ethernet connections must have a port defined." `
+    -Where {$_.ObjectProperties.type -eq "ethernet"} `
+    -Rule {
+        ($Input[0].ObjectProperties.srcport -match "\d+") -and ($Input[0].ObjectProperties.dstport -match "\d+")
+    } `
+    -ErrorMessage "Ethernet does not have src and dst!"
+```
+
 ### Usage
 
 ```powershell
