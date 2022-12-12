@@ -1,5 +1,6 @@
 . ./drawio-tools.ps1
 . ./diagram-processor.ps1
+. ./diagram-linter.ps1
 
 # Get-DrawIOCells -filePath .\test.drawio -tabName "Page-1"
 # | Select-Object -First 1 -Skip 11
@@ -32,6 +33,34 @@
 # Container        : True
 # StyleShape       : mxgraph.aws4.group
 # StyleIcon        : mxgraph.aws4.group_region
+
+# Lint the diagram
+
+$vertexRules = @(
+    New-DiagramLinterRule `
+        -Name "All shapes must have a description" `
+        -Where {$null -eq $_.ObjectProperties.description} `
+        -Rule {$false} `
+        -ErrorMessage "Shape does not have a description!"
+)
+
+$edgeRules = @(
+    New-DiagramLinterRule `
+        -Name "All ethernet connections must have a port defined." `
+        -Where {$_.ObjectProperties.type -eq "ethernet"} `
+        -Rule {
+            ($Input[0].ObjectProperties.srcport -match "\d+") -and ($Input[0].ObjectProperties.dstport -match "\d+")
+        } `
+        -ErrorMessage "Ethernet does not have src and dst!"
+)
+
+forEach ($page in $pages) {
+    $pageElements = Get-Elements -filePath $file -tabName $page
+    Invoke-DiagramLint -Elements @($pageElements.Vertecies) -RuleSet $vertexRules
+    Invoke-DiagramLint -Elements @($pageElements.Edges) -RuleSet $edgeRules
+}
+
+# Render Diagram
 
 $ShapePreprocessors = {
     param($node, $depth)

@@ -1,13 +1,20 @@
 . ./drawio-tools.ps1
 function Get-Elements($filePath, $tabName) {
-    $vertecies = Get-DrawIOVertecies -filePath $filePath -tabName $tabName
+    $all = Get-DrawIOAllElements -filePath $filePath -tabName $tabName
+
+    $vertecies = $all | Where-Object GraphObjectType -eq "Vertex"
+    $edges = $all | Where-Object GraphObjectType -eq "Edge"
     $idMapping = @{}
     foreach($v in $vertecies) {
         $idMapping.Add($v.id, $v)|Out-Null
     }
+    foreach($e in $edges) {
+        $idMapping.Add($e.id, $e)|Out-Null
+    }
     [pscustomobject]@{
         Vertecies = $vertecies
         LookupTable = $idMapping
+        Edges = $edges
     }
 }
 
@@ -21,7 +28,7 @@ function Write-MarkdownBlock($title, $text, $level) {
 }
 
 function Get-DrawIOContainerComponents($Elements, $ContainerID) {
-    $containers = $Elements.Vertecies | Where-Object Container -eq $true
+    #$containers = $Elements.Vertecies | Where-Object Container -eq $true
     $Elements.Vertecies | Where-Object Parent -eq $ContainerID | ForEach-Object {
         [PSCustomObject]@{
             id = $_.id
@@ -91,7 +98,7 @@ function Get-DecomposedDiagramElements($Elements) {
     $title = ($Elements.Vertecies | Where-Object {$_.ObjectProperties.labelType -eq "Title"}).Name
 
     # Heirarchy
-    $heirarchy = @{}
+    #$heirarchy = @{}
     $containers = $Elements.Vertecies | Where-Object Container -eq $true
     $roots = @($containers | Where-Object Parent -eq 1)
 

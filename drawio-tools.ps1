@@ -39,6 +39,47 @@ function Parse-DrawIOCell($cell) {
     $graphTheoryType = ""
     $style = Get-DrawIOStyleProperties -cell $cell
 
+    # Name
+    $name = ""
+
+    # id
+    $id = ""
+
+    # Child of Object? (For extra meta labels)
+    $isChildOf = $cell.ParentNode.Name
+    $objectProperties = @{}
+    if ($isChildOf -eq "object") {
+        # Vertex is a child of an object node, meaning there's extra metadata wrapped around
+        # it in the XML. Likely for custom label logic and properties.
+        forEach ($attrib in $cell.ParentNode.Attributes) {
+            $objectProperties.Add($attrib.Name, $attrib.Value)|Out-Null
+        }
+
+        # ID does not change
+        $id = $cell.ParentNode.id
+
+        # Placeholder Logic
+        if ($objectProperties.ContainsKey("label")) {
+            $name = $objectProperties["label"]
+        }
+        if ($objectProperties.ContainsKey("placeholder")) {
+            $labelProp = $objectProperties["placeholder"]
+            $name = $objectProperties[$labelProp]
+        }
+        if ($objectProperties.ContainsKey("placeholders")) {
+            # TODO: Need to implement 'search up' logic for parent container inheritance.
+            forEach ($kv in $objectProperties.GetEnumerator()) {
+                if ($null -ne $kv.Value) {$name = $name.Replace("%" + $kv.Key + "%", $kv.Value)}
+            }
+            $name = $name.Replace("<br>"," - ")
+        }
+    }else{
+        # Vertex is a child of the root. Standard Behavior.
+        $name = $cell.value
+        $id = $cell.id
+    }
+
+
     if ($cell.vertex -eq 1) {
         # Cell is a Vertex
         $graphTheoryType = "Vertex"
@@ -59,12 +100,6 @@ function Parse-DrawIOCell($cell) {
         $isContainer = $false
         if ($style.ContainsKey("container")) {$isContainer = $true}
 
-        # Name
-        $name = ""
-
-        # id
-        $id = ""
-
         # Shape
         $styleShape = ""
         if ($style.ContainsKey("shape")) {$styleShape = $style["shape"]}
@@ -74,39 +109,7 @@ function Parse-DrawIOCell($cell) {
         if ($style.ContainsKey("resIcon")) {$styleIcon = $style["resIcon"]}
         if ($style.ContainsKey("grIcon")) {$styleIcon = $style["grIcon"]}
 
-        # Child of Object? (For extra meta labels)
-        $isChildOf = $cell.ParentNode.Name
-        $objectProperties = @{}
-        if ($isChildOf -eq "object") {
-            # Vertex is a child of an object node, meaning there's extra metadata wrapped around
-            # it in the XML. Likely for custom label logic and properties.
-            forEach ($attrib in $cell.ParentNode.Attributes) {
-                $objectProperties.Add($attrib.Name, $attrib.Value)|Out-Null
-            }
-
-            # ID does not change
-            $id = $cell.ParentNode.id
-
-            # Placeholder Logic
-            if ($objectProperties.ContainsKey("label")) {
-                $name = $objectProperties["label"]
-            }
-            if ($objectProperties.ContainsKey("placeholder")) {
-                $labelProp = $objectProperties["placeholder"]
-                $name = $objectProperties[$labelProp]
-            }
-            if ($objectProperties.ContainsKey("placeholders")) {
-                # TODO: Need to implement 'search up' logic for parent container inheritance.
-                forEach ($kv in $objectProperties.GetEnumerator()) {
-                    if ($null -ne $kv.Value) {$name = $name.Replace("%" + $kv.Key + "%", $kv.Value)}
-                }
-                $name = $name.Replace("<br>"," - ")
-            }
-        }else{
-            # Vertex is a child of the root. Standard Behavior.
-            $name = $cell.value
-            $id = $cell.id
-        }
+        
 
         [PSCustomObject]@{
             Name = $name
@@ -144,12 +147,15 @@ function Parse-DrawIOCell($cell) {
         if (($null -eq $cell.source) -or ($null -eq $cell.target)){$graphTheoryType = "none"}
 
         [PSCustomObject]@{
-            Name = $cell.value
-            id = $cell.id
+            Name = $name
+            id = $id
             GraphObjectType = $graphTheoryType
             Direction = $direction
             Source = $cell.source
             Target = $cell.target
+            ChildOf = $isChildOf
+            ObjectProperties = $objectProperties
+            Parent = $cell.parent
         }
     }
 }
@@ -162,6 +168,12 @@ function Get-DrawIOEdges($filePath, $tabName) {
 
 function Get-DrawIOVertecies($filePath, $tabName) {
     Get-DrawIOCells -filePath $filePath -tabName $tabName | Where-Object vertex -eq 1 | ForEach-Object {
+        Parse-DrawIOCell -cell $_
+    }
+}
+
+function Get-DrawIOAllElements($filePath, $tabName) {
+    Get-DrawIOCells -filePath $filePath -tabName $tabName | Where-Object {($_.vertex -eq 1)-or($_.edge -eq 1)} | ForEach-Object {
         Parse-DrawIOCell -cell $_
     }
 }
