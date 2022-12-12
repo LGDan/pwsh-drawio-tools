@@ -44,6 +44,10 @@ New-DiagramLinterRule `
     -ErrorMessage "Ethernet does not have src and dst!"
 ```
 
+## watcher.ps1
+
+Monitors for diagram changes, and re-renders the diagram if the linter passes.
+
 ### Usage
 
 ```powershell
